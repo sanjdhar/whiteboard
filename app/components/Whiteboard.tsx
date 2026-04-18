@@ -178,26 +178,30 @@ export default function Whiteboard() {
   return (
     <div className="w-full h-screen flex flex-col bg-white">
       {/* Tabs */}
-      <div className="bg-gray-50 border-b border-gray-300 flex items-center gap-2 px-4 py-2 overflow-x-auto">
+      <div className="bg-gray-200 border-b-2 border-gray-400 flex items-center gap-2 px-4 py-2 overflow-x-auto">
         {tabs.map((tab) => (
           <div
             key={tab.id}
-            className={`flex items-center gap-2 px-3 py-2 rounded-t border border-b-0 cursor-pointer transition ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-t border-2 cursor-pointer transition ${
               activeTabId === tab.id
-                ? "bg-white border-gray-300"
-                : "bg-gray-100 border-gray-200 hover:bg-gray-200"
+                ? "bg-blue-500 text-white border-blue-600 shadow-lg"
+                : "bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-150"
             }`}
           >
             <button
               onClick={() => switchTab(tab.id)}
-              className="font-medium text-sm"
+              className="font-semibold text-sm"
             >
               {tab.name}
             </button>
             {tabs.length > 1 && (
               <button
                 onClick={() => closeTab(tab.id)}
-                className="text-gray-500 hover:text-red-500 font-bold text-sm"
+                className={`font-bold text-sm transition ${
+                  activeTabId === tab.id
+                    ? "text-white hover:text-gray-200"
+                    : "text-gray-500 hover:text-red-600"
+                }`}
               >
                 ✕
               </button>
