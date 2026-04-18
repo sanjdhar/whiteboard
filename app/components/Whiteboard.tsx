@@ -23,6 +23,7 @@ const COLORS = [
 export default function Whiteboard() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tabCounterRef = useRef(1);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState<Tool>("pen");
   const [color, setColor] = useState("#000000");
@@ -194,6 +195,136 @@ export default function Whiteboard() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   };
 
+  const exportWorkspace = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const currentImageData = getCurrentDrawing();
+    
+    const offscreen1 = document.createElement('canvas');
+    offscreen1.width = canvas.width;
+    offscreen1.height = canvas.height;
+    const ctx1 = offscreen1.getContext('2d');
+    
+    const offscreen2 = document.createElement('canvas');
+    offscreen2.width = canvas.width;
+    offscreen2.height = canvas.height;
+    const ctx2 = offscreen2.getContext('2d');
+    
+    if (!ctx1 || !ctx2) return;
+
+    const workspaceTabs = tabs.map(tab => {
+      let dataURL = null;
+      const targetImageData = tab.id === activeTabId ? currentImageData : tab.imageData;
+      
+      if (targetImageData) {
+        ctx1.putImageData(targetImageData, 0, 0);
+        ctx2.fillStyle = '#ffffff';
+        ctx2.fillRect(0, 0, offscreen2.width, offscreen2.height);
+        ctx2.drawImage(offscreen1, 0, 0);
+        dataURL = offscreen2.toDataURL("image/png");
+      }
+      
+      return {
+        id: tab.id,
+        name: tab.name,
+        dataURL
+      };
+    });
+
+    const workspace = {
+      version: 1,
+      activeTabId,
+      tabs: workspaceTabs
+    };
+    
+    const jsonStr = JSON.stringify(workspace);
+    const blob = new Blob([jsonStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement("a");
+    link.download = "whiteboard_workspace.json";
+    link.href = url;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result as string;
+        const workspace = JSON.parse(text);
+        
+        if (workspace.version === 1 && Array.isArray(workspace.tabs)) {
+          const canvas = canvasRef.current;
+          if (!canvas) return;
+          
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = canvas.width;
+          tempCanvas.height = canvas.height;
+          const ctx = tempCanvas.getContext('2d');
+          if (!ctx) return;
+          
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const newTabs = await Promise.all(workspace.tabs.map((tabData: any) => {
+            return new Promise<Tab>((resolve) => {
+              if (!tabData.dataURL) {
+                resolve({
+                  id: tabData.id,
+                  name: tabData.name,
+                  imageData: null
+                });
+                return;
+              }
+              
+              const img = new Image();
+              img.onload = () => {
+                ctx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+                ctx.drawImage(img, 0, 0);
+                const imageData = ctx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                resolve({
+                  id: tabData.id,
+                  name: tabData.name,
+                  imageData
+                });
+              };
+              img.onerror = () => {
+                resolve({
+                  id: tabData.id,
+                  name: tabData.name,
+                  imageData: null
+                });
+              };
+              img.src = tabData.dataURL;
+            });
+          }));
+          
+          setTabs(newTabs);
+          
+          const maxId = Math.max(...newTabs.map((t: Tab) => parseInt(t.id) || 0), 0);
+          tabCounterRef.current = maxId;
+          
+          setActiveTabId(workspace.activeTabId || newTabs[0]?.id || "1");
+        }
+      } catch (err) {
+        console.error("Failed to parse workspace file", err);
+      } finally {
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div className="w-full h-screen flex flex-col bg-white">
       {/* Tabs */}
@@ -308,6 +439,29 @@ export default function Whiteboard() {
         >
           🗑️ Clear
         </button>
+
+        {/* Import/Export */}
+        <div className="flex gap-2 ml-auto">
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileChange} 
+            accept=".json" 
+            className="hidden" 
+          />
+          <button
+            onClick={handleImportClick}
+            className="px-4 py-2 bg-green-500 text-white rounded font-medium hover:bg-green-600 transition"
+          >
+            📥 Import All
+          </button>
+          <button
+            onClick={exportWorkspace}
+            className="px-4 py-2 bg-purple-500 text-white rounded font-medium hover:bg-purple-600 transition"
+          >
+            📤 Export All
+          </button>
+        </div>
       </div>
 
       {/* Canvas */}
