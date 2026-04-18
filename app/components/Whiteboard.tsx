@@ -61,40 +61,57 @@ export default function Whiteboard() {
     return () => window.removeEventListener("resize", handleResize);
   }, [activeTabId, tabs]);
 
-  const saveCurrentDrawing = () => {
+  const getCurrentDrawing = () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) return null;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    setTabs(tabs.map((t) => (t.id === activeTabId ? { ...t, imageData } : t)));
+    if (!ctx) return null;
+    return ctx.getImageData(0, 0, canvas.width, canvas.height);
   };
 
   const addTab = () => {
-    saveCurrentDrawing();
+    const imageData = getCurrentDrawing();
     tabCounterRef.current += 1;
     const newId = tabCounterRef.current.toString();
-    const newTab: Tab = {
-      id: newId,
-      name: `Drawing ${tabs.length + 1}`,
-      imageData: null,
-    };
-    setTabs([...tabs, newTab]);
+    
+    setTabs((prevTabs) => {
+      const updatedTabs = prevTabs.map((t) =>
+        t.id === activeTabId ? { ...t, imageData } : t
+      );
+      const newTab: Tab = {
+        id: newId,
+        name: `Drawing ${prevTabs.length + 1}`,
+        imageData: null,
+      };
+      return [...updatedTabs, newTab];
+    });
     setActiveTabId(newId);
   };
 
   const switchTab = (id: string) => {
-    saveCurrentDrawing();
+    if (id === activeTabId) return;
+    const imageData = getCurrentDrawing();
+    setTabs((prevTabs) =>
+      prevTabs.map((t) => (t.id === activeTabId ? { ...t, imageData } : t))
+    );
     setActiveTabId(id);
   };
 
   const closeTab = (id: string) => {
     if (tabs.length === 1) return;
-    const newTabs = tabs.filter((t) => t.id !== id);
-    setTabs(newTabs);
+    
+    const imageData = getCurrentDrawing();
+    
+    setTabs((prevTabs) => {
+      const updatedTabs = prevTabs.map((t) =>
+        t.id === activeTabId ? { ...t, imageData } : t
+      );
+      return updatedTabs.filter((t) => t.id !== id);
+    });
+    
     if (activeTabId === id) {
-      setActiveTabId(newTabs[0].id);
+      const remainingTabs = tabs.filter((t) => t.id !== id);
+      setActiveTabId(remainingTabs[0].id);
     }
   };
 
