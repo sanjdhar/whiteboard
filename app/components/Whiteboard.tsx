@@ -5,6 +5,12 @@ import { useRef, useEffect, useState } from "react";
 type Tool = "pen" | "eraser";
 type LineWidth = 2 | 5 | 8;
 
+interface Tab {
+  id: string;
+  name: string;
+  imageData: ImageData | null;
+}
+
 const COLORS = [
   "#000000",
   "#FF0000",
@@ -20,6 +26,10 @@ export default function Whiteboard() {
   const [tool, setTool] = useState<Tool>("pen");
   const [color, setColor] = useState("#000000");
   const [lineWidth, setLineWidth] = useState<LineWidth>(2);
+  const [tabs, setTabs] = useState<Tab[]>([
+    { id: "1", name: "Drawing 1", imageData: null },
+  ]);
+  const [activeTabId, setActiveTabId] = useState("1");
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -30,17 +40,61 @@ export default function Whiteboard() {
 
     // Set canvas size to window size
     canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    canvas.height = window.innerHeight - 120;
+
+    // Restore previous drawing if it exists
+    const activeTab = tabs.find((t) => t.id === activeTabId);
+    if (activeTab?.imageData) {
+      ctx.putImageData(activeTab.imageData, 0, 0);
+    }
 
     // Handle window resize
     const handleResize = () => {
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      canvas.height = window.innerHeight - 120;
+      ctx.putImageData(imageData, 0, 0);
     };
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  }, [activeTabId, tabs]);
+
+  const saveCurrentDrawing = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    setTabs(tabs.map((t) => (t.id === activeTabId ? { ...t, imageData } : t)));
+  };
+
+  const addTab = () => {
+    saveCurrentDrawing();
+    const newId = Date.now().toString();
+    const newTab: Tab = {
+      id: newId,
+      name: `Drawing ${tabs.length + 1}`,
+      imageData: null,
+    };
+    setTabs([...tabs, newTab]);
+    setActiveTabId(newId);
+  };
+
+  const switchTab = (id: string) => {
+    saveCurrentDrawing();
+    setActiveTabId(id);
+  };
+
+  const closeTab = (id: string) => {
+    if (tabs.length === 1) return;
+    const newTabs = tabs.filter((t) => t.id !== id);
+    setTabs(newTabs);
+    if (activeTabId === id) {
+      setActiveTabId(newTabs[0].id);
+    }
+  };
 
   const startDrawing = (
     e:
@@ -123,6 +177,41 @@ export default function Whiteboard() {
 
   return (
     <div className="w-full h-screen flex flex-col bg-white">
+      {/* Tabs */}
+      <div className="bg-gray-50 border-b border-gray-300 flex items-center gap-2 px-4 py-2 overflow-x-auto">
+        {tabs.map((tab) => (
+          <div
+            key={tab.id}
+            className={`flex items-center gap-2 px-3 py-2 rounded-t border border-b-0 cursor-pointer transition ${
+              activeTabId === tab.id
+                ? "bg-white border-gray-300"
+                : "bg-gray-100 border-gray-200 hover:bg-gray-200"
+            }`}
+          >
+            <button
+              onClick={() => switchTab(tab.id)}
+              className="font-medium text-sm"
+            >
+              {tab.name}
+            </button>
+            {tabs.length > 1 && (
+              <button
+                onClick={() => closeTab(tab.id)}
+                className="text-gray-500 hover:text-red-500 font-bold text-sm"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        ))}
+        <button
+          onClick={addTab}
+          className="ml-2 px-3 py-2 bg-blue-500 text-white rounded font-medium hover:bg-blue-600 transition text-sm"
+        >
+          + New
+        </button>
+      </div>
+
       {/* Toolbar */}
       <div className="bg-gray-100 border-b border-gray-300 p-4 flex items-center gap-6 flex-wrap">
         {/* Tool Selection */}
