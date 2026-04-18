@@ -22,6 +22,7 @@ const COLORS = [
 
 export default function Whiteboard() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const tabCounterRef = useRef(1);
   const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState<Tool>("pen");
   const [color, setColor] = useState("#000000");
@@ -72,7 +73,8 @@ export default function Whiteboard() {
 
   const addTab = () => {
     saveCurrentDrawing();
-    const newId = Date.now().toString();
+    tabCounterRef.current += 1;
+    const newId = tabCounterRef.current.toString();
     const newTab: Tab = {
       id: newId,
       name: `Drawing ${tabs.length + 1}`,
